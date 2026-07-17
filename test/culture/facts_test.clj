@@ -1,0 +1,37 @@
+(ns culture.facts-test
+  (:require [clojure.edn :as edn]
+            [clojure.string :as str]
+            [clojure.test :refer [deftest is]]
+            [culture.facts :as facts]))
+
+(deftest cape-town-has-culture-basis
+  (let [sb (facts/spec-basis "cape-town")]
+    (is (= 10 (count sb)))
+    (is (= (count sb) (count (set (map :culture/id sb)))))
+    (is (every? #(str/starts-with? (:culture/url %) "https://") sb))
+    (is (every? #(= "cape-town" (:culture/municipality %)) sb))
+    (is (every? #(= "ZAF" (:culture/country %)) sb))
+    (is (every? #(seq (:culture/summary %)) sb))
+    (is (every? #(string? (:culture/retrieved-at %)) sb))))
+
+(deftest unknown-municipality-has-no-basis
+  (is (nil? (facts/spec-basis "johannesburg")))
+  (is (nil? (facts/spec-basis "zzz"))))
+
+(deftest coverage-is-honest
+  (let [c (facts/coverage ["cape-town" "johannesburg"])]
+    (is (= 2 (:requested c)))
+    (is (= 1 (:covered c)))
+    (is (= ["johannesburg"] (:missing-municipalities c)))))
+
+(deftest by-kind-filters
+  (is (= 4 (count (facts/by-kind "cape-town" :dish))))
+  (is (= ["cape-town.festival.kaapse-klopse"]
+         (mapv :culture/id (facts/by-kind "cape-town" :festival))))
+  (is (empty? (facts/by-kind "cape-town" :craft)))
+  (is (empty? (facts/by-kind "johannesburg" :dish))))
+
+(deftest tx-file-matches-catalog
+  (let [tx (edn/read-string (slurp "data/culture-tx.edn"))
+        flat (mapcat val (sort-by key facts/catalog))]
+    (is (= (vec flat) (vec tx)))))
